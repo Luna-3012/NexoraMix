@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { 
-  Zap, 
-  Loader, 
-  AlertCircle, 
-  Sparkles, 
-  Star,
-  RefreshCw,
-  Heart,
-  Target,
-  Swords,
-  Handshake,
-  Merge
-} from 'lucide-react'
+import { Zap, Loader, AlertCircle, Sparkles, Star, RefreshCw, Heart, Target, Swords, HeartHandshake as Handshake, Merge } from 'lucide-react'
 import { apiService } from '../lib/api'
 
 const BrandMixer = () => {
