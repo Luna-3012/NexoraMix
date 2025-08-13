@@ -1,11 +1,11 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import json
-import os
 import logging
-import random
 from datetime import datetime
-import uuid
+from services.llama_service import llama_service
+from services.claude_service import claude_service
+from services.image_service import image_service
+from services.supabase_service import supabase_service
 
 # Configure logging
 logging.basicConfig(
@@ -17,120 +17,13 @@ logger = logging.getLogger(__name__)
 app = Flask(__name__)
 CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
 
-# Enhanced in-memory storage
-combos_store = []
-votes_store = {}
-
-# Enhanced brand data with categories
-BRAND_DATA = {
-    "food": ["McDonald's", "Burger King", "KFC", "Subway", "Pizza Hut", "Domino's", "Taco Bell"],
-    "beverages": ["Coca-Cola", "Pepsi", "Starbucks", "Red Bull", "Monster", "Dr Pepper"],
-    "tech": ["Apple", "Samsung", "Google", "Microsoft", "Amazon", "Netflix", "Spotify"],
-    "fashion": ["Nike", "Adidas", "Gucci", "Louis Vuitton", "H&M", "Zara", "Supreme"],
-    "automotive": ["Tesla", "BMW", "Mercedes", "Toyota", "Ford", "Ferrari", "Lamborghini"]
-}
-
-# Enhanced combo generation templates
-COMBO_TEMPLATES = {
-    "competitive": {
-        "adjectives": ["Ultimate", "Supreme", "Elite", "Champion", "Legendary", "Epic", "Dominant"],
-        "nouns": ["Clash", "Battle", "Showdown", "Duel", "Championship", "Arena", "Combat"],
-        "slogans": [
-            "Where {product1} meets its match with {product2}",
-            "The ultimate showdown: {product1} vs {product2}",
-            "When {product1} challenges {product2} to greatness"
-        ]
-    },
-    "collaborative": {
-        "adjectives": ["Unified", "Harmonious", "Synergistic", "Blended", "United", "Fused", "Allied"],
-        "nouns": ["Alliance", "Partnership", "Unity", "Harmony", "Fusion", "Bond", "Collaboration"],
-        "slogans": [
-            "Where {product1} and {product2} unite for greatness",
-            "The perfect partnership of {product1} and {product2}",
-            "When {product1} joins forces with {product2}"
-        ]
-    },
-    "fusion": {
-        "adjectives": ["Hybrid", "Merged", "Blended", "Integrated", "Combined", "Synthesized", "Evolved"],
-        "nouns": ["Fusion", "Hybrid", "Evolution", "Synthesis", "Metamorphosis", "Transformation", "Revolution"],
-        "slogans": [
-            "The revolutionary fusion of {product1} and {product2}",
-            "Where {product1} and {product2} become one",
-            "The next evolution: {product1} meets {product2}"
-        ]
-    }
-}
-
-def get_brand_category(brand):
-    """Determine the category of a brand"""
-    brand_lower = brand.lower()
-    for category, brands in BRAND_DATA.items():
-        if any(b.lower() in brand_lower or brand_lower in b.lower() for b in brands):
-            return category
-    return "general"
-
-def generate_enhanced_combo(product1, product2, mode="competitive"):
-    """Enhanced combo generator with better logic"""
-    try:
-        # Get brand categories
-        cat1 = get_brand_category(product1)
-        cat2 = get_brand_category(product2)
-        
-        # Select appropriate template
-        template = COMBO_TEMPLATES.get(mode, COMBO_TEMPLATES["competitive"])
-        
-        # Generate name
-        adjective = random.choice(template["adjectives"])
-        noun = random.choice(template["nouns"])
-        name = f"{adjective} {noun}"
-        
-        # Generate slogan
-        slogan = random.choice(template["slogans"]).format(
-            product1=product1, 
-            product2=product2
-        )
-        
-        # Generate description based on categories
-        if cat1 == cat2:
-            description = f"A groundbreaking {cat1} experience that combines the best of {product1}'s heritage with {product2}'s innovation."
-        else:
-            description = f"An unprecedented cross-industry collaboration bringing together {product1}'s {cat1} expertise with {product2}'s {cat2} mastery."
-        
-        # Generate host reaction
-        reactions = [
-            f"This {name} is absolutely revolutionary! The way {product1} and {product2} complement each other is genius!",
-            f"I've never seen anything like this {name} before. {product1} and {product2} create pure magic together!",
-            f"The {name} represents the future of brand collaboration. {product1} and {product2} are a match made in heaven!",
-            f"Incredible! This {name} shows how {product1} and {product2} can push boundaries together!"
-        ]
-        
-        combo = {
-            "id": str(uuid.uuid4()),
-            "name": name,
-            "slogan": slogan,
-            "flavor_description": description,
-            "host_reaction": f"Brand Mixologist: '{random.choice(reactions)}'",
-            "components": {"a": product1, "b": product2},
-            "mode": mode,
-            "categories": {"a": cat1, "b": cat2},
-            "created_at": datetime.utcnow().isoformat() + "Z",
-            "votes": 0,
-            "compatibility_score": random.randint(75, 98)
-        }
-        
-        return combo
-        
-    except Exception as e:
-        logger.error(f"Error generating combo: {e}")
-        raise
-
 @app.route("/")
 def home():
     return jsonify({
         "message": "Nexora Brand Mixologist API",
         "status": "healthy",
-        "version": "2.0.0",
-        "endpoints": ["/generate", "/leaderboard", "/vote", "/health", "/brands"]
+        "version": "3.0.0",
+        "endpoints": ["/generate", "/leaderboard", "/vote", "/health"]
     })
 
 @app.route("/generate", methods=["POST"])
@@ -159,9 +52,52 @@ def generate():
         
         logger.info(f"Generating combo for {product1} + {product2} (mode: {mode})")
         
-        combo = generate_enhanced_combo(product1, product2, mode)
-        combos_store.append(combo)
-        votes_store[combo["id"]] = 0
+        # Step 1: Query LlamaIndex for brand information
+        brand_info = llama_service.query_brands(product1, product2)
+        
+        # Step 2: Generate fusion concept with Claude
+        fusion_data = claude_service.generate_brand_fusion(product1, product2, mode, brand_info)
+        
+        # Step 3: Generate image with Stable Diffusion
+        image_url = None
+        if fusion_data.get("image_prompt"):
+            image_url = image_service.generate_image(
+                fusion_data["image_prompt"], 
+                product1, 
+                product2
+            )
+        
+        # Step 4: Prepare combo data
+        combo = {
+            "name": fusion_data["name"],
+            "slogan": fusion_data["slogan"],
+            "flavor_description": fusion_data["description"],
+            "host_reaction": fusion_data["host_reaction"],
+            "components": {"a": product1, "b": product2},
+            "mode": mode,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "votes": 0,
+            "compatibility_score": fusion_data["compatibility_score"],
+            "image_url": image_url,
+            "unique_features": fusion_data.get("unique_features", []),
+            "target_audience": fusion_data.get("target_audience", "")
+        }
+        
+        # Step 5: Save to Supabase
+        saved_combo = supabase_service.create_combo({
+            "name": combo["name"],
+            "slogan": combo["slogan"],
+            "description": combo["flavor_description"],
+            "product1": product1,
+            "product2": product2,
+            "mode": mode,
+            "host_reaction": combo["host_reaction"],
+            "image_url": image_url,
+            "compatibility_score": combo["compatibility_score"]
+        })
+        
+        if saved_combo:
+            combo["id"] = saved_combo["id"]
         
         logger.info(f"Generated combo: {combo['name']} (ID: {combo['id']})")
         
@@ -179,19 +115,14 @@ def leaderboard():
     try:
         limit = min(int(request.args.get("limit", 10)), 50)
         
-        # Sort combos by votes, then by compatibility score
-        sorted_combos = sorted(
-            combos_store, 
-            key=lambda x: (x.get("votes", 0), x.get("compatibility_score", 0)), 
-            reverse=True
-        )
-        top_combos = sorted_combos[:limit]
+        # Get combos from Supabase
+        top_combos = supabase_service.get_leaderboard(limit)
         
         logger.info(f"Retrieved {len(top_combos)} combos for leaderboard")
         
         return jsonify({
             "combos": top_combos,
-            "total_count": len(combos_store),
+            "total_count": len(top_combos),
             "message": "Leaderboard retrieved successfully"
         })
         
@@ -210,57 +141,46 @@ def vote():
         if not combo_id:
             return jsonify({"error": "combo_id is required"}), 400
         
-        # Find and update combo
-        for combo in combos_store:
-            if combo["id"] == combo_id:
-                combo["votes"] = combo.get("votes", 0) + 1
-                votes_store[combo_id] = combo["votes"]
-                
-                logger.info(f"Vote registered for {combo_id}: {combo['votes']} total votes")
-                
-                return jsonify({
-                    "status": "voted",
-                    "votes": combo["votes"],
-                    "combo_name": combo["name"],
-                    "message": "Vote registered successfully"
-                })
+        # Vote using Supabase
+        success = supabase_service.vote_for_combo(combo_id)
         
-        return jsonify({"error": "Combo not found"}), 404
+        if success:
+            return jsonify({
+                "status": "voted",
+                "message": "Vote registered successfully"
+            })
+        else:
+            return jsonify({"error": "Failed to register vote"}), 500
         
     except Exception as e:
         logger.exception(f"Error in vote endpoint: {e}")
         return jsonify({"error": "Failed to register vote"}), 500
 
-@app.route("/brands", methods=["GET"])
-def get_brands():
-    """Get available brands by category"""
+@app.route("/stats", methods=["GET"])
+def get_stats():
+    """Get overall statistics"""
     try:
-        category = request.args.get("category", "all")
-        
-        if category == "all":
-            all_brands = []
-            for brands in BRAND_DATA.values():
-                all_brands.extend(brands)
-            return jsonify({"brands": all_brands, "categories": list(BRAND_DATA.keys())})
-        
-        if category in BRAND_DATA:
-            return jsonify({"brands": BRAND_DATA[category], "category": category})
-        
-        return jsonify({"error": "Invalid category"}), 400
+        stats = supabase_service.get_stats()
+        return jsonify(stats)
         
     except Exception as e:
-        logger.exception(f"Error in brands endpoint: {e}")
-        return jsonify({"error": "Failed to retrieve brands"}), 500
+        logger.exception(f"Error in stats endpoint: {e}")
+        return jsonify({"error": "Failed to retrieve stats"}), 500
 
 @app.route("/health", methods=["GET"])
 def health():
     return jsonify({
         "status": "healthy",
         "service": "nexora-brand-mixologist",
-        "version": "2.0.0",
-        "combos_count": len(combos_store),
-        "total_votes": sum(votes_store.values()),
-        "uptime": "running"
+        "version": "3.0.0",
+        "services": {
+            "llama_index": llama_service.initialized,
+            "claude": claude_service.client is not None,
+            "image_generation": image_service.available,
+            "supabase": supabase_service.client is not None
+        },
+        "uptime": "running",
+        "timestamp": datetime.utcnow().isoformat() + "Z"
     })
 
 @app.errorhandler(404)
@@ -272,17 +192,23 @@ def internal_error(error):
     return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
-    # Add sample data for demo
-    sample_combos = [
-        generate_enhanced_combo("Coca-Cola", "Pepsi", "competitive"),
-        generate_enhanced_combo("Nike", "Adidas", "competitive"),
-        generate_enhanced_combo("Apple", "Samsung", "fusion")
-    ]
+    # Initialize services and load brand data
+    try:
+        # Load brand knowledge base into LlamaIndex
+        import json
+        from pathlib import Path
+        
+        kb_file = Path("data/processed/brands_knowledge_base.json")
+        if kb_file.exists():
+            with open(kb_file, 'r', encoding='utf-8') as f:
+                brand_data = json.load(f)
+            llama_service.add_documents(brand_data)
+            logger.info(f"Loaded {len(brand_data)} brands into LlamaIndex")
+        else:
+            logger.warning("Brand knowledge base not found - run the data pipeline first")
+            
+    except Exception as e:
+        logger.error(f"Failed to initialize brand data: {e}")
     
-    for combo in sample_combos:
-        combo["votes"] = random.randint(1, 15)
-        combos_store.append(combo)
-        votes_store[combo["id"]] = combo["votes"]
-    
-    logger.info("Starting Nexora Brand Mixologist API...")
+    logger.info("Starting Nexora Brand Mixologist API v3.0...")
     app.run(debug=True, port=5000, host="0.0.0.0")

@@ -1,5 +1,4 @@
 import axios from 'axios'
-import { supabaseOperations } from './supabase'
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000'
 
@@ -45,24 +44,6 @@ export const apiService = {
         product2: product2.trim(),
         mode
       })
-      
-      // Save to Supabase if available
-      try {
-        const combo = response.data.combo
-        await supabaseOperations.createCombo({
-          name: combo.name,
-          slogan: combo.slogan,
-          description: combo.flavor_description,
-          product1: combo.components.a,
-          product2: combo.components.b,
-          mode: combo.mode,
-          votes: 0,
-          host_reaction: combo.host_reaction
-        })
-      } catch (supabaseError) {
-        console.warn('Failed to save to Supabase:', supabaseError)
-      }
-      
       return response.data
     } catch (error) {
       throw new Error(error.response?.data?.error || 'Failed to generate combo')
@@ -72,39 +53,30 @@ export const apiService = {
   // Get leaderboard
   async getLeaderboard(limit = 10) {
     try {
-      // Try Supabase first
-      const supabaseData = await supabaseOperations.getCombos(limit)
-      return { combos: supabaseData }
-    } catch (supabaseError) {
-      console.warn('Supabase unavailable, using backend:', supabaseError)
-      
-      // Fallback to backend
       const response = await api.get(`/leaderboard?limit=${limit}`)
       return response.data
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to get leaderboard')
     }
   },
 
   // Vote for combo
   async voteForCombo(comboId) {
     try {
-      // Try Supabase first
-      await supabaseOperations.voteForCombo(comboId)
-      return { status: 'voted' }
-    } catch (supabaseError) {
-      console.warn('Supabase unavailable, using backend:', supabaseError)
-      
-      // Fallback to backend
       const response = await api.post('/vote', { combo_id: comboId })
       return response.data
+    } catch (error) {
+      throw new Error(error.response?.data?.error || 'Failed to vote')
     }
   },
 
   // Get statistics
   async getStats() {
     try {
-      return await supabaseOperations.getStats()
-    } catch (supabaseError) {
-      console.warn('Supabase unavailable for stats:', supabaseError)
+      const response = await api.get('/stats')
+      return response.data
+    } catch (error) {
+      console.warn('Failed to get stats:', error)
       return { totalCombos: 0, totalVotes: 0 }
     }
   },
@@ -116,6 +88,16 @@ export const apiService = {
       return response.data
     } catch (error) {
       throw new Error('Backend is not responding')
+    }
+  },
+
+  // Get service status
+  async getServiceStatus() {
+    try {
+      const response = await api.get('/health')
+      return response.data
+    } catch (error) {
+      throw new Error('Failed to get service status')
     }
   }
 }
