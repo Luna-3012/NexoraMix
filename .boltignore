@@ -1,0 +1,14 @@
+# Ignore large files that aren't essential for core functionality
+README.md
+validate_setup.py
+tests/
+src/experiments/
+scripts/error_handler.py
+scripts/generate_embeddings.py
+scripts/build_index.py
+src/ai/image_gen.py
+src/storage/supabase_upload.py
+src/storage/chroma_store.py
+src/backend/ab_testing.py
+utils/wiki_api.py
+utils/json_formatter.py

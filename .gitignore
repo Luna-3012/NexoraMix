@@ -1,0 +1,78 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.env/
+.venv/
+.nexora-venv/
+nexora-venv/
+
+
+# Python dotenv environment files (contain secrets)
+.env
+
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+
+# Jupyter Notebook checkpoints
+.ipynb_checkpoints/
+
+# PyCharm / IntelliJ IDEA project files
+.idea/
+*.iml
+
+# VS Code settings
+.vscode/
+*.code-workspace
+
+# Sublime Text files
+*.sublime-project
+*.sublime-workspace
+
+# macOS files
+.DS_Store
+
+# Windows thumbnail cache files
+Thumbs.db
+
+# Logs
+*.log
+data/logs/
+
+# Data folders 
+data/raw
+
+# Environment files (secrets)
+.env
+
+Project Structure
+2.0.0
+test_imports.py
+utils/
+
+# Node.js dependencies
+node_modules/
