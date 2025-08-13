@@ -12,6 +12,7 @@ const BrandMixer = () => {
   const [error, setError] = useState('')
   const [availableBrands, setAvailableBrands] = useState([])
   const [backendStatus, setBackendStatus] = useState('checking')
+  const [serviceStatus, setServiceStatus] = useState({})
 
   useEffect(() => {
     checkBackendHealth()
@@ -20,8 +21,9 @@ const BrandMixer = () => {
 
   const checkBackendHealth = async () => {
     try {
-      await apiService.healthCheck()
+      const status = await apiService.getServiceStatus()
       setBackendStatus('healthy')
+      setServiceStatus(status.services || {})
     } catch (err) {
       setBackendStatus('error')
       setError('Backend is not responding. Please start the backend server.')
@@ -108,9 +110,22 @@ const BrandMixer = () => {
     return (
       <div className="brand-mixer">
         <div className="mixer-container">
+          {result.unique_features && result.unique_features.length > 0 && (
+            <div className="result-features">
+              <h4>Unique Features:</h4>
+              <ul>
+                {result.unique_features.map((feature, index) => (
+                  <li key={index}>{feature}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
           <div className="error-message">
             <AlertCircle size={20} />
-            Backend server is not running. Please start it with: <code>cd backend && python app.py</code>
+            {result.target_audience && (
+              <span className="result-audience">Target: {result.target_audience}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -132,6 +147,35 @@ const BrandMixer = () => {
           Combine two brands and unleash the power of AI fusion
         </p>
       </motion.div>
+
+      {Object.keys(serviceStatus).length > 0 && (
+        <motion.div
+          className="service-status"
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <h4>Service Status</h4>
+          <div className="status-grid">
+            <div className={`status-item ${serviceStatus.llama_index ? 'active' : 'inactive'}`}>
+              <span>LlamaIndex</span>
+              <span className="status-indicator">{serviceStatus.llama_index ? '✓' : '✗'}</span>
+            </div>
+            <div className={`status-item ${serviceStatus.claude ? 'active' : 'inactive'}`}>
+              <span>Claude AI</span>
+              <span className="status-indicator">{serviceStatus.claude ? '✓' : '✗'}</span>
+            </div>
+            <div className={`status-item ${serviceStatus.image_generation ? 'active' : 'inactive'}`}>
+              <span>Image Gen</span>
+              <span className="status-indicator">{serviceStatus.image_generation ? '✓' : '✗'}</span>
+            </div>
+            <div className={`status-item ${serviceStatus.supabase ? 'active' : 'inactive'}`}>
+              <span>Supabase</span>
+              <span className="status-indicator">{serviceStatus.supabase ? '✓' : '✗'}</span>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       <div className="mixer-container">
         <motion.div
@@ -249,6 +293,18 @@ const BrandMixer = () => {
           </button>
         </motion.div>
 
+            {result.image_url && (
+              <div className="result-image">
+                <img 
+                  src={result.image_url} 
+                  alt={result.name}
+                  onError={(e) => {
+                    e.target.style.display = 'none'
+                  }}
+                />
+              </div>
+            )}
+            
         {error && (
           <motion.div
             className="error-message"
