@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion'
 import { Zap, Loader, AlertCircle, Sparkles, Star, RefreshCw, Heart, Target, Swords, HeartHandshake as Handshake, Merge } from 'lucide-react'
@@ -24,6 +25,12 @@ const ServiceStatus = ({ status }) => {
         </div>
     );
 };
+=======
+import React, { useState, useEffect } from 'react'
+import { motion } from 'framer-motion'
+import { Zap, Loader, AlertCircle, Sparkles, Star, RefreshCw, Heart, Target, Swords, HeartHandshake as Handshake, Merge } from 'lucide-react'
+import { apiService } from '../lib/api'
+>>>>>>> 18728f3429fee1a9a5bd0ae1e6c6c19b9cfc16b6
 
 const BrandMixer = () => {
   const [product1, setProduct1] = useState('')
@@ -65,6 +72,7 @@ const BrandMixer = () => {
   ]
 
   useEffect(() => {
+<<<<<<< HEAD
         checkServiceStatus();
         const intervalId = setInterval(checkServiceStatus, 30000);
         return () => clearInterval(intervalId);
@@ -79,6 +87,26 @@ const BrandMixer = () => {
     } catch (err) {
       setError(error.message);
       setServiceStatus(null);
+=======
+    checkServiceStatus()
+  }, [])
+
+  const checkServiceStatus = async () => {
+    try {
+      const status = await apiService.getServiceStatus()
+      setServiceStatus(status)
+    } catch (err) {
+      console.warn('Could not check service status:', err)
+      setServiceStatus({ 
+        status: 'unknown',
+        services: {
+          llama_index: false,
+          claude: false,
+          image_generation: false,
+          supabase: false
+        }
+      })
+>>>>>>> 18728f3429fee1a9a5bd0ae1e6c6c19b9cfc16b6
     }
   }
 
@@ -98,7 +126,11 @@ const BrandMixer = () => {
     setResult(null)
 
     try {
+<<<<<<< HEAD
       const response = await api.generateCombo(product1, product2, mode)
+=======
+      const response = await apiService.generateCombo(product1, product2, mode)
+>>>>>>> 18728f3429fee1a9a5bd0ae1e6c6c19b9cfc16b6
       setResult(response.combo)
     } catch (err) {
       console.error('Generation error:', err)
@@ -112,7 +144,11 @@ const BrandMixer = () => {
     if (!result?.id) return
 
     try {
+<<<<<<< HEAD
       await api.voteForCombo(result.id)
+=======
+      await apiService.voteForCombo(result.id)
+>>>>>>> 18728f3429fee1a9a5bd0ae1e6c6c19b9cfc16b6
       setResult(prev => ({
         ...prev,
         votes: (prev.votes || 0) + 1
