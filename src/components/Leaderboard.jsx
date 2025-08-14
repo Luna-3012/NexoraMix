@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
 import { Trophy, Star, TrendingUp, Users, Heart, Loader, RefreshCw } from 'lucide-react'
-import { apiService } from '../lib/api'
+import { api } from '../lib/api'
 
 const Leaderboard = () => {
   const [combos, setCombos] = useState([])
@@ -19,7 +19,7 @@ const Leaderboard = () => {
     try {
       setLoading(true)
       setError('')
-      const response = await apiService.getLeaderboard(10)
+      const response = await api.getLeaderboard(10)
       setCombos(response.combos || [])
     } catch (err) {
       setError(err.message || 'Failed to load leaderboard')
@@ -30,7 +30,7 @@ const Leaderboard = () => {
 
   const fetchStats = async () => {
     try {
-      const statsData = await apiService.getStats()
+      const statsData = await api.getStats()
       setStats(statsData)
     } catch (err) {
       console.warn('Failed to load stats:', err)
@@ -42,7 +42,7 @@ const Leaderboard = () => {
 
     try {
       setVotingLoading(prev => ({ ...prev, [comboId]: true }))
-      await apiService.voteForCombo(comboId)
+      await api.voteForCombo(comboId)
       
       // Update local state optimistically
       setCombos(prev => prev.map(combo => 

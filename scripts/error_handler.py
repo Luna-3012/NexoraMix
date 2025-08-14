@@ -1,4 +1,3 @@
-# scripts/error_handler.py
 import os
 import traceback
 from datetime import datetime

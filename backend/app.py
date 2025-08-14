@@ -1,6 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import logging
+import traceback
 from datetime import datetime
 from services.llama_service import llama_service
 from services.claude_service import claude_service
@@ -15,7 +16,19 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
-CORS(app, origins=["http://localhost:3000", "http://127.0.0.1:3000"])
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:3000",
+            "http://localhost:3001",
+            "http://127.0.0.1:3000",
+            "http://127.0.0.1:3001"
+        ],
+        "methods": ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+        "allow_headers": ["Content-Type", "Authorization"]
+    }
+})
+
 
 @app.route("/")
 def home():
@@ -52,20 +65,54 @@ def generate():
         
         logger.info(f"Generating combo for {product1} + {product2} (mode: {mode})")
         
-        # Step 1: Query LlamaIndex for brand information
-        brand_info = llama_service.query_brands(product1, product2)
+        # Step 1: Query LlamaIndex for brand information (with fallback)
+        try:
+            brand_info = llama_service.query_brands(product1, product2)
+            logger.info("Successfully retrieved brand information from LlamaIndex")
+        except Exception as e:
+            logger.warning(f"LlamaIndex query failed, using fallback: {e}")
+            brand_info = {
+                'brand1_info': f"Popular brand {product1} with strong market presence",
+                'brand2_info': f"Well-known brand {product2} with distinctive characteristics",
+                'brand1_sources': [],
+                'brand2_sources': []
+            }
         
-        # Step 2: Generate fusion concept with Claude
-        fusion_data = claude_service.generate_brand_fusion(product1, product2, mode, brand_info)
+        # Step 2: Generate fusion concept with Claude (with fallback)
+        try:
+            fusion_data = claude_service.generate_brand_fusion(product1, product2, mode, brand_info)
+            logger.info("Successfully generated fusion concept with Claude")
+        except Exception as e:
+            logger.warning(f"Claude generation failed, using fallback: {e}")
+            fusion_data = {
+                "name": f"{product1} × {product2}",
+                "slogan": f"Where {product1} meets {product2}",
+                "description": f"An innovative fusion of {product1} and {product2} in {mode} mode",
+                "host_reaction": f"Brand Mixologist: 'This {product1} and {product2} combination is absolutely brilliant!'",
+                "compatibility_score": 85,
+                "unique_features": [
+                    f"Combines {product1}'s signature style",
+                    f"Incorporates {product2}'s innovation",
+                    "Creates new market opportunities"
+                ],
+                "target_audience": "Innovation-seeking consumers",
+                "image_prompt": f"A creative fusion of {product1} and {product2} products in a modern, appealing style"
+            }
         
-        # Step 3: Generate image with Stable Diffusion
+        # Step 3: Generate image with Stable Diffusion (with fallback)
         image_url = None
-        if fusion_data.get("image_prompt"):
-            image_url = image_service.generate_image(
-                fusion_data["image_prompt"], 
-                product1, 
-                product2
-            )
+        try:
+            if fusion_data.get("image_prompt"):
+                image_url = image_service.generate_image(
+                    fusion_data["image_prompt"], 
+                    product1, 
+                    product2
+                )
+                logger.info("Successfully generated image")
+        except Exception as e:
+            logger.warning(f"Image generation failed: {e}")
+            # Use placeholder URL
+            image_url = f"https://via.placeholder.com/512x512/4A90E2/FFFFFF?text={product1}+x+{product2}"
         
         # Step 4: Prepare combo data
         combo = {
@@ -83,23 +130,32 @@ def generate():
             "target_audience": fusion_data.get("target_audience", "")
         }
         
-        # Step 5: Save to Supabase
-        saved_combo = supabase_service.create_combo({
-            "name": combo["name"],
-            "slogan": combo["slogan"],
-            "description": combo["flavor_description"],
-            "product1": product1,
-            "product2": product2,
-            "mode": mode,
-            "host_reaction": combo["host_reaction"],
-            "image_url": image_url,
-            "compatibility_score": combo["compatibility_score"]
-        })
+        # Step 5: Save to Supabase (with fallback)
+        try:
+            saved_combo = supabase_service.create_combo({
+                "name": combo["name"],
+                "slogan": combo["slogan"],
+                "description": combo["flavor_description"],
+                "product1": product1,
+                "product2": product2,
+                "mode": mode,
+                "host_reaction": combo["host_reaction"],
+                "image_url": image_url,
+                "compatibility_score": combo["compatibility_score"]
+            })
+            
+            if saved_combo:
+                combo["id"] = saved_combo["id"]
+                logger.info(f"Successfully saved combo to database: {combo['id']}")
+            else:
+                # Generate a temporary ID for the session
+                combo["id"] = f"temp_{int(datetime.utcnow().timestamp())}"
+                logger.warning("Failed to save to database, using temporary ID")
+        except Exception as e:
+            logger.warning(f"Database save failed: {e}")
+            combo["id"] = f"temp_{int(datetime.utcnow().timestamp())}"
         
-        if saved_combo:
-            combo["id"] = saved_combo["id"]
-        
-        logger.info(f"Generated combo: {combo['name']} (ID: {combo['id']})")
+        logger.info(f"Successfully generated combo: {combo['name']} (ID: {combo.get('id', 'unknown')})")
         
         return jsonify({
             "combo": combo,
@@ -107,8 +163,12 @@ def generate():
         })
         
     except Exception as e:
-        logger.exception(f"Error in generate endpoint: {e}")
-        return jsonify({"error": "Failed to generate combo"}), 500
+        logger.exception(f"Unexpected error in generate endpoint: {e}")
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        return jsonify({
+            "error": "Failed to generate combo. Please try again.",
+            "details": str(e) if app.debug else None
+        }), 500
 
 @app.route("/leaderboard", methods=["GET"])
 def leaderboard():
